@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1033551215866",
+    "project_id": "adar-a4812",
+    "storage_bucket": "adar-a4812.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1033551215866:android:236e18afcff31e61be1d43",
+        "android_client_info": {
+          "package_name": "com.example.adar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5W0Isb6epRzr1atQchNoO-Db6dWdtVoA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

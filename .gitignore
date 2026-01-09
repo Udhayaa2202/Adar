@@ -1,45 +1,35 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# --- SECURITY & SECRETS ---
+# Ignore the environment file containing your Supabase Keys and URLs
+.env
+*.env
+# If you use Firebase, ignore the auto-generated options file to keep keys private
+lib/firebase_options.dart
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# --- FLUTTER & DART ---
+# Ignore build artifacts and tool folders
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
+build/
+# If you use the web platform
+build_test/
 .pub-cache/
 .pub/
-/build/
-/coverage/
 
-# Symbolication related
-app.*.symbols
+# --- OPERATING SYSTEMS ---
+# Ignore macOS system files
+.DS_Store
+# Ignore Windows thumbnail caches
+Thumbs.db
 
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# --- IDEs & EDITORS ---
+# VS Code
+.vscode/
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+# Crash logs
+flutter_*.log
