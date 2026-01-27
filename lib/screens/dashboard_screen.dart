@@ -11,11 +11,26 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   String _anonymousId = "";
   String _trustScore = "";
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
     _fetchData();
+    _searchFocusNode.addListener(() {
+      setState(() {
+        _isSearching = _searchFocusNode.hasFocus;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchData() async {
@@ -26,6 +41,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  void _handleSearch() {
+    final String reportId = _searchController.text.trim();
+    if (reportId.length == 6) {
+      // Ready to fetch report logic here
+      print("Fetching report: ADAR-$reportId");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Searching for ADAR-$reportId...")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid 6-digit Report ID")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,7 +63,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text("DASHBOARD", style: TextStyle(letterSpacing: 2, fontSize: 16)),
         backgroundColor: const Color(0xFF0D1B2A),
-        automaticallyImplyLeading: false, // Removes back button
+        automaticallyImplyLeading: false,
       ),
       body: Padding(
         padding: const EdgeInsets.all(25.0),
@@ -64,10 +94,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 20),
+            // Search Bar
+            TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFF0D1B2A),
+                hintText: "Enter Your Report-ID",
+                hintStyle: const TextStyle(color: Colors.white54),
+                prefixText: "ADAR-",
+                prefixStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.search, color: Colors.blue),
+                  onPressed: _handleSearch,
+                ),
+                counterText: "", // Hides the character counter
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(15),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+              ),
+            ),
             const Spacer(),
 
-            const Text("Ready to report activity?",
-                style: TextStyle(color: Colors.white60)),
+            Text(_isSearching ? "Enter ID to search" : "Ready to report activity?",
+                style: const TextStyle(color: Colors.white60)),
             const SizedBox(height: 20),
 
             ElevatedButton(
@@ -76,9 +133,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 minimumSize: const Size(double.infinity, 65),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
-              onPressed: () => Navigator.pushNamed(context, '/report'),
-              child: const Text("START NEW REPORT",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: _isSearching
+                  ? _handleSearch
+                  : () => Navigator.pushNamed(context, '/report'),
+              child: Text(
+                  _isSearching ? "SEARCH" : "START NEW REPORT",
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 20),
           ],
