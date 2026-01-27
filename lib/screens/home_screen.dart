@@ -10,37 +10,28 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _anonymousId = "Loading...";
-  String _trustScore = "4.0";
+  bool _isLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadUserData();
-  }
+  Future<void> _handleStart() async {
+    setState(() => _isLoading = true);
 
-  // Logic to get or create unique user data
-  Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Check if ID already exists
-    String? savedId = prefs.getString('anon_id');
-    double? savedScore = prefs.getDouble('trust_score');
-
-    if (savedId == null) {
-      // First time user: Create a random ID like ABX7K5F2
+    // Logic to ensure user data exists before moving to dashboard
+    if (prefs.getString('anon_id') == null) {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ123456789';
-      savedId = List.generate(8, (i) => chars[Random().nextInt(chars.length)]).join();
-      savedScore = 4.0; // Default starting score
-
-      await prefs.setString('anon_id', savedId);
-      await prefs.setDouble('trust_score', savedScore);
+      String newId = List.generate(8, (i) => chars[Random().nextInt(chars.length)]).join();
+      await prefs.setString('anon_id', newId);
+      await prefs.setDouble('trust_score', 4.0);
     }
 
-    setState(() {
-      _anonymousId = savedId!;
-      _trustScore = savedScore!.toStringAsFixed(1);
-    });
+    // Brief delay to show the "Secure Connection" loading effect
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (mounted) {
+      // Navigate to the Dashboard (We will define this route in main.dart)
+      Navigator.pushReplacementNamed(context, '/dashboard');
+    }
   }
 
   @override
@@ -82,8 +73,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 30),
-            Padding(
+            const SizedBox(height: 40),
+
+            // Loading Bar or Button
+            _isLoading
+                ? const Column(
+              children: [
+                CircularProgressIndicator(color: Color(0xFF0056D2)),
+                SizedBox(height: 20),
+                Text("Establishing Secure Grid...",
+                    style: TextStyle(color: Colors.white38, fontSize: 12)),
+              ],
+            )
+                : Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -94,45 +96,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(30),
                   ),
                 ),
-                onPressed: () {
-                  Navigator.pushNamed(context, '/report');
-                },
+                onPressed: _handleStart,
                 child: const Text(
                   "Start Reporting",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-              ),
-            ),
-            const SizedBox(height: 40),
-
-            // 4. Dynamic Trust Score Section
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    "You are Anonymous ID: $_anonymousId",
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                  const SizedBox(height: 5),
-                  RichText(
-                    text: TextSpan(
-                      text: "Trust Score: ",
-                      style: const TextStyle(color: Colors.white70),
-                      children: [
-                        TextSpan(
-                          text: _trustScore,
-                          style: const TextStyle(
-                              color: Colors.amber, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ),
           ],

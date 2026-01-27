@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:adar/screens/dashboard_screen.dart';
+
 
 /// Screen displayed after a report is successfully submitted.
 /// Provides the user with a tracking ID and safety instructions.
@@ -75,7 +77,8 @@ class ReportSuccessScreen extends StatelessWidget {
         children: [
           const Text(
             "TRACKING ID",
-            style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           SelectableText(
@@ -99,11 +102,14 @@ class ReportSuccessScreen extends StatelessWidget {
       children: [
         const Text(
           "SAFETY NEXT STEPS:",
-          style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 10),
-        _buildSafetyStep(Icons.delete_sweep, "Delete the original photo/video from your gallery."),
-        _buildSafetyStep(Icons.lock_outline, "This report is now anonymous and cannot be traced to you."),
+        _buildSafetyStep(Icons.delete_sweep,
+            "Delete the original photo/video from your gallery."),
+        _buildSafetyStep(Icons.lock_outline,
+            "This report is now anonymous and cannot be traced to you."),
       ],
     );
   }
@@ -127,6 +133,7 @@ class ReportSuccessScreen extends StatelessWidget {
     );
   }
 
+  // Move this to report_success_screen.dart
   Widget _buildReturnButton(BuildContext context) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
@@ -134,7 +141,14 @@ class ReportSuccessScreen extends StatelessWidget {
         minimumSize: const Size(double.infinity, 60),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       ),
-      onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+      onPressed: () {
+        print("Button Clicked!");
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+              (route) => false,
+        );
+      },
       child: const Text(
         "RETURN TO DASHBOARD",
         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),

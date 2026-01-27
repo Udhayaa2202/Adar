@@ -5,6 +5,8 @@ import 'package:firebase_core/firebase_core.dart';
 
 // Import your screens (ensure these paths match your project structure)
 import 'screens/report_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +25,24 @@ void main() async {
 
   runApp(const AdarApp());
 }
+//
+// class AdarApp extends StatelessWidget {
+//   const AdarApp({super.key});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       title: 'ADAR Reporter',
+//       debugShowCheckedModeBanner: false,
+//       theme: ThemeData(
+//         brightness: Brightness.dark,
+//         primarySwatch: Colors.blue,
+//       ),
+//       // This is where your app actually starts
+//       home: const ReportScreen(),
+//     );
+//   }
+// }
 
 class AdarApp extends StatelessWidget {
   const AdarApp({super.key});
@@ -36,8 +56,14 @@ class AdarApp extends StatelessWidget {
         brightness: Brightness.dark,
         primarySwatch: Colors.blue,
       ),
-      // This is where your app actually starts
-      home: const ReportScreen(),
+      // 1. Change home to HomeScreen
+      home: const HomeScreen(),
+
+      // 2. Define the named route for the Report Screen
+      routes: {
+          '/dashboard': (context) => const DashboardScreen(),
+          '/report': (context) => const ReportScreen(),
+      },
     );
   }
 }

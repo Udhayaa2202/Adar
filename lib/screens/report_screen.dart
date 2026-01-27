@@ -229,8 +229,6 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  // --- Helper UI & Pickers (Condensed) ---
-
   Future<void> _pickPhoto(ImageSource source) async {
     final XFile? file = await _picker.pickImage(source: source, imageQuality: 70);
     if (file != null) setState(() => _selectedImage = File(file.path));
