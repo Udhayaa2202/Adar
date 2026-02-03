@@ -14,7 +14,7 @@ dependencies:
 
   # Core Logic & Utilities
   shared_preferences: ^2.2.3
-  intl: ^0.19.0 # Updated for better compatibility
+  intl: any # Updated for better compatibility
   permission_handler: ^11.3.1
   path_provider: ^2.1.2
 
@@ -38,12 +38,20 @@ dependencies:
   # Icons
   cupertino_icons: ^1.0.8
 
+  # State Management
+  provider: ^6.1.1
+
+  # Localization
+  flutter_localizations:
+    sdk: flutter
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
 
 flutter:
+  generate: true
   uses-material-design: true
   # Add your assets here if you have logos or images
   assets:

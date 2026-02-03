@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:adar/screens/dashboard_screen.dart';
+import 'package:intl/intl.dart';
+import 'package:adar/l10n/app_localizations.dart';
 
-
-/// Screen displayed after a report is successfully submitted.
-/// Provides the user with a tracking ID and safety instructions.
 class ReportSuccessScreen extends StatelessWidget {
   final String reportId;
 
@@ -24,13 +23,12 @@ class ReportSuccessScreen extends StatelessWidget {
             children: [
               const Spacer(),
 
-              // Status Header
               const Icon(Icons.shield_rounded, size: 100, color: Colors.blue),
               const SizedBox(height: 30),
-              const Text(
-                "INTELLIGENCE SUBMITTED",
+               Text(
+                AppLocalizations.of(context)!.intelligenceSubmitted,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -38,25 +36,22 @@ class ReportSuccessScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 15),
-              const Text(
-                "Your report has been encrypted and routed to the secure intelligence grid.",
+               Text(
+                AppLocalizations.of(context)!.reportSubmittedMessage,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white60, fontSize: 14),
+                style: const TextStyle(color: Colors.white60, fontSize: 14),
               ),
 
               const SizedBox(height: 40),
 
-              // Tracking Identifier Card
-              _buildTrackingCard(),
+             _buildTrackingCard(context),
 
               const SizedBox(height: 50),
 
-              // Safety Protocol Instructions
-              _buildSafetyProtocolSection(),
+              _buildSafetyProtocolSection(context),
 
               const Spacer(),
 
-              // Navigation Action
               _buildReturnButton(context),
             ],
           ),
@@ -65,7 +60,7 @@ class ReportSuccessScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTrackingCard() {
+  Widget _buildTrackingCard(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -75,9 +70,9 @@ class ReportSuccessScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Text(
-            "TRACKING ID",
-            style: TextStyle(
+           Text(
+            AppLocalizations.of(context)!.trackingId,
+            style: const TextStyle(
                 color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
@@ -96,20 +91,20 @@ class ReportSuccessScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSafetyProtocolSection() {
+  Widget _buildSafetyProtocolSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          "SAFETY NEXT STEPS:",
-          style: TextStyle(
+         Text(
+          AppLocalizations.of(context)!.safetyNextSteps,
+          style: const TextStyle(
               color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 10),
         _buildSafetyStep(Icons.delete_sweep,
-            "Delete the original photo/video from your gallery."),
+            AppLocalizations.of(context)!.safetyStep1),
         _buildSafetyStep(Icons.lock_outline,
-            "This report is now anonymous and cannot be traced to you."),
+            AppLocalizations.of(context)!.safetyStep2),
       ],
     );
   }
@@ -133,7 +128,6 @@ class ReportSuccessScreen extends StatelessWidget {
     );
   }
 
-  // Move this to report_success_screen.dart
   Widget _buildReturnButton(BuildContext context) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
@@ -142,16 +136,26 @@ class ReportSuccessScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       ),
       onPressed: () {
-        print("Button Clicked!");
+        final newReport = {
+          "id": reportId.startsWith("ADAR-") ? reportId : "ADAR-$reportId",
+          "status": "PENDING",
+          "date": DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now()),
+          "location": "Current Location",
+          "description": "Report submitted via intelligence portal. Analyzing data..."
+        };
+
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+          MaterialPageRoute(builder: (context) => DashboardScreen(newReport: newReport)),
               (route) => false,
         );
       },
-      child: const Text(
-        "RETURN TO DASHBOARD",
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          AppLocalizations.of(context)!.returnToDashboard,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }

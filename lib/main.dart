@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:adar/l10n/app_localizations.dart';
 
 // Import your screens (ensure these paths match your project structure)
 import 'screens/report_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'providers/language_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Load the environment file
   await dotenv.load(fileName: ".env");
 
   // 2. Initialize Firebase
@@ -23,46 +26,47 @@ void main() async {
     anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
   );
 
-  runApp(const AdarApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => LanguageProvider(),
+      child: const AdarApp(),
+    ),
+  );
 }
-//
-// class AdarApp extends StatelessWidget {
-//   const AdarApp({super.key});
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: 'ADAR Reporter',
-//       debugShowCheckedModeBanner: false,
-//       theme: ThemeData(
-//         brightness: Brightness.dark,
-//         primarySwatch: Colors.blue,
-//       ),
-//       // This is where your app actually starts
-//       home: const ReportScreen(),
-//     );
-//   }
-// }
 
 class AdarApp extends StatelessWidget {
   const AdarApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ADAR Reporter',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primarySwatch: Colors.blue,
-      ),
-      // 1. Change home to HomeScreen
-      home: const HomeScreen(),
+    return Consumer<LanguageProvider>(
+      builder: (context, languageProvider, child) {
+        return MaterialApp(
+          title: 'ADAR Reporter',
+          debugShowCheckedModeBanner: false,
+          locale: languageProvider.currentLocale,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en'), // English
+            Locale('ta'), // Tamil
+          ],
+          theme: ThemeData(
+            brightness: Brightness.dark,
+            primarySwatch: Colors.blue,
+          ),
+          // 1. Change home to HomeScreen
+          home: const HomeScreen(),
 
-      // 2. Define the named route for the Report Screen
-      routes: {
-          '/dashboard': (context) => const DashboardScreen(),
-          '/report': (context) => const ReportScreen(),
+          routes: {
+              '/dashboard': (context) => const DashboardScreen(),
+              '/report': (context) => const ReportScreen(),
+          },
+        );
       },
     );
   }

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:adar/l10n/app_localizations.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final Map<String, dynamic>? newReport;
+
+  const DashboardScreen({super.key, this.newReport});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -35,25 +39,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _fetchData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _anonymousId = prefs.getString('anon_id') ?? "Unknown";
-      _trustScore = (prefs.getDouble('trust_score') ?? 4.0).toStringAsFixed(1);
-    });
+    if (mounted) {
+      setState(() {
+        _anonymousId = prefs.getString('anon_id') ?? "Unknown";
+        _trustScore = (prefs.getDouble('trust_score') ?? 4.0).toStringAsFixed(1);
+      });
+    }
   }
 
-  void _handleSearch() {
+  void _handleSearch() async {
     final String reportId = _searchController.text.trim();
     if (reportId.length == 6) {
-      // Ready to fetch report logic here
-      print("Fetching report: ADAR-$reportId");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Searching for ADAR-$reportId...")),
-      );
+      final fullId = "ADAR-$reportId";
+      _dismissKeyboard();
+
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('reports')
+            .doc(fullId)
+            .get();
+
+        if (doc.exists && mounted) {
+          _showReportDetails(doc.data() as Map<String, dynamic>);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(AppLocalizations.of(context)!.reportNotFound(fullId)),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error searching: $e"),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid 6-digit Report ID")),
+        SnackBar(content: Text(AppLocalizations.of(context)!.validIdError)),
       );
     }
+  }
+
+  void _dismissKeyboard() {
+    FocusScope.of(context).unfocus();
   }
 
   @override
@@ -61,9 +97,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("DASHBOARD", style: TextStyle(letterSpacing: 2, fontSize: 16)),
+        title: Text(
+            AppLocalizations.of(context)!.dashboardTitle, style: const TextStyle(letterSpacing: 2, fontSize: 16)),
         backgroundColor: const Color(0xFF0D1B2A),
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: () {
+               // Navigate entirely back to the start
+               Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(25.0),
@@ -84,10 +130,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text("ID: $_anonymousId",
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          style: const TextStyle(color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                       const SizedBox(height: 5),
-                      Text("TRUST SCORE: $_trustScore",
-                          style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text("${AppLocalizations.of(context)!.trustScore}: $_trustScore",
+                          style: const TextStyle(color: Colors.amber,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const Icon(Icons.shield, color: Colors.blue, size: 40),
@@ -105,44 +154,256 @@ class _DashboardScreenState extends State<DashboardScreen> {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: const Color(0xFF0D1B2A),
-                hintText: "Enter Your Report-ID",
+                hintText: AppLocalizations.of(context)!.searchHint,
                 hintStyle: const TextStyle(color: Colors.white54),
                 prefixText: "ADAR-",
-                prefixStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                prefixStyle: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search, color: Colors.blue),
                   onPressed: _handleSearch,
                 ),
-                counterText: "", // Hides the character counter
+                counterText: "",
+                // Hides the character counter
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(15),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                contentPadding: const EdgeInsets.symmetric(
+                    vertical: 15, horizontal: 20),
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 30),
 
-            Text(_isSearching ? "Enter ID to search" : "Ready to report activity?",
-                style: const TextStyle(color: Colors.white60)),
-            const SizedBox(height: 20),
+            // Your Reports Section
+             Align(
+              alignment: Alignment.centerLeft,
+              child: Text(AppLocalizations.of(context)!.yourReports,
+                  style: const TextStyle(color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2)),
+            ),
+            const SizedBox(height: 15),
+
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _anonymousId.isNotEmpty
+                    ? FirebaseFirestore.instance
+                        .collection('reports')
+                        .where('userId', isEqualTo: _anonymousId)
+                        .snapshots()
+                    : null,
+                builder: (context, snapshot) {
+                  if (_anonymousId.isEmpty) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    // Provide a cleaner error if something else goes wrong
+                    return Center(child: Text('Error loading reports: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
+                  }
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        "No reports found for this ID.",
+                        style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                      ),
+                    );
+                  }
+
+                  final reports = snapshot.data!.docs;
+                  
+                  // Sort locally to avoid creating a Firestore composite index
+                  reports.sort((a, b) {
+                    final aData = a.data() as Map<String, dynamic>;
+                    final bData = b.data() as Map<String, dynamic>;
+                    
+                    // Handle Timestamp or String dates if legacy
+                    dynamic getTimestamp(Map<String, dynamic> data) {
+                       if (data['createdAt'] is Timestamp) {
+                         return (data['createdAt'] as Timestamp).toDate();
+                       }
+                       // Fallback for mock data or string dates if any
+                       return DateTime.now(); 
+                    }
+
+                    final aTime = getTimestamp(aData);
+                    final bTime = getTimestamp(bData);
+                    
+                    return bTime.compareTo(aTime); // Descending
+                  });
+
+                  return ListView.builder(
+                    itemCount: reports.length,
+                    itemBuilder: (context, index) {
+                      final reportData = reports[index].data() as Map<String, dynamic>;
+                      // Handle legacy mock data structure compatibility if needed, though we are writing fresh
+                      final String reportId = reportData['reportId'] ?? reportData['id'] ?? 'Unknown ID';
+                      final String status = reportData['status'] ?? 'PENDING';
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 15),
+                        padding: const EdgeInsets.all(15),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(reportId,
+                                    style: const TextStyle(color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16)),
+                                const SizedBox(height: 5),
+                                Row(
+                                  children: [
+                                    Icon(Icons.circle, size: 8,
+                                        color: _getStatusColor(status)),
+                                    const SizedBox(width: 5),
+                                    Text(status,
+                                        style: TextStyle(color: _getStatusColor(status),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue.withOpacity(0.2),
+                                foregroundColor: Colors.blue,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () => _showReportDetails(reportData),
+                              child: Text(AppLocalizations.of(context)!.viewReport),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 10),
 
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0056D2),
                 minimumSize: const Size(double.infinity, 65),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15)),
               ),
               onPressed: _isSearching
                   ? _handleSearch
                   : () => Navigator.pushNamed(context, '/report'),
               child: Text(
-                  _isSearching ? "SEARCH" : "START NEW REPORT",
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  _isSearching ? AppLocalizations.of(context)!.searchButton : AppLocalizations.of(context)!.startNewReport,
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    final s = status.toUpperCase();
+    if (s == 'VERIFIED') return Colors.greenAccent;
+    if (s == 'PENDING') return Colors.orangeAccent;
+    if (s == 'UNDER REVIEW') return Colors.lightBlueAccent;
+    if (s == 'REJECTED') return Colors.redAccent;
+    return Colors.grey;
+  }
+
+  void _showReportDetails(Map<String, dynamic> report) {
+    // Safely handle missing fields
+    final String rId = report['reportId'] ?? report['id'] ?? 'N/A';
+    final String rStatus = report['status'] ?? 'Unknown';
+    final String rDate = report['incidentDate'] ?? report['date'] ?? 'N/A';
+    final String rLocation = report['location'] ?? 'Unknown Location';
+    final String rDesc = report['description'] ?? 'No Description';
+
+    showDialog(
+      context: context,
+      builder: (context) =>
+          Dialog(
+            backgroundColor: const Color(0xFF0D1B2A),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                       Text(AppLocalizations.of(context)!.reportDetails, style: const TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5)),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white54),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: Colors.white10),
+                  const SizedBox(height: 15),
+                  _buildDetailRow("ID", rId),
+                  _buildDetailRow(AppLocalizations.of(context)!.statusStatus, rStatus,
+                      color: _getStatusColor(rStatus)),
+                  _buildDetailRow(AppLocalizations.of(context)!.dateDate, rDate),
+                  _buildDetailRow(AppLocalizations.of(context)!.locationLocation, rLocation),
+                  const SizedBox(height: 15),
+                   Text(AppLocalizations.of(context)!.descriptionDescription, style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 5),
+                  Text(rDesc, style: const TextStyle(
+                      color: Colors.white70, height: 1.4)),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value,
+      {Color color = Colors.white}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(label, style: const TextStyle(color: Colors.white54,
+                fontSize: 12,
+                fontWeight: FontWeight.bold)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }

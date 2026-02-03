@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:adar/l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'report_success_screen.dart';
 
 class IntelligentReporterChat extends StatefulWidget {
@@ -35,22 +37,17 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
   bool _isUploading = false;
   int _currentQuestionIndex = 0;
 
-  final List<Map<String, dynamic>> _questions = [
-    {"id": "frequency", "text": "How often have you noticed this happening?", "options": ["Daily", "Weekly", "Just once"]},
-    {"id": "sensitive_area", "text": "Is this near a sensitive area like a school or park?", "options": ["Yes, very close", "No, far away"]},
-    {"id": "activity_type", "text": "What best describes the activity you saw?", "options": ["Dealing/Exchange", "Stash/Drop-off", "Usage"]},
-    {"id": "vehicles", "text": "Were there any vehicles involved in the scene?", "options": ["Parked car/bike", "Moving vehicle", "None"]},
-    {"id": "people_count", "text": "Approximate number of people involved?", "options": ["1-2 people", "Small group (3-5)", "Large crowd"]},
-  ];
-
   @override
   void initState() {
     super.initState();
-    _startChat();
+    // We delay the start chat to ensure context is available for localization
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startChat();
+    });
   }
 
   void _startChat() async {
-    _addAssistantMessage("Hello. I've analyzed your initial report. I need 5 quick details to help the authorities prioritize this.");
+    _addAssistantMessage(AppLocalizations.of(context)!.assistantIntro);
     await Future.delayed(const Duration(seconds: 1));
     _askNextQuestion();
   }
@@ -60,7 +57,55 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
   }
 
   void _askNextQuestion() {
-    if (_currentQuestionIndex < _questions.length) {
+    // We fetch questions dynamically to ensure they are localized
+    final List<Map<String, dynamic>> questions = [
+      {
+        "id": "frequency",
+        "text": AppLocalizations.of(context)!.q_frequency,
+        "options": [
+          AppLocalizations.of(context)!.q_frequency_opt1,
+          AppLocalizations.of(context)!.q_frequency_opt2,
+          AppLocalizations.of(context)!.q_frequency_opt3
+        ]
+      },
+      {
+        "id": "sensitive_area",
+        "text": AppLocalizations.of(context)!.q_sensitive_area,
+        "options": [
+          AppLocalizations.of(context)!.q_sensitive_area_opt1,
+          AppLocalizations.of(context)!.q_sensitive_area_opt2
+        ]
+      },
+      {
+        "id": "activity_type",
+        "text": AppLocalizations.of(context)!.q_activity_type,
+        "options": [
+          AppLocalizations.of(context)!.q_activity_type_opt1,
+          AppLocalizations.of(context)!.q_activity_type_opt2,
+          AppLocalizations.of(context)!.q_activity_type_opt3
+        ]
+      },
+      {
+        "id": "vehicles",
+        "text": AppLocalizations.of(context)!.q_vehicles,
+        "options": [
+          AppLocalizations.of(context)!.q_vehicles_opt1,
+          AppLocalizations.of(context)!.q_vehicles_opt2,
+          AppLocalizations.of(context)!.q_vehicles_opt3
+        ]
+      },
+      {
+        "id": "people_count",
+        "text": AppLocalizations.of(context)!.q_people_count,
+        "options": [
+          AppLocalizations.of(context)!.q_people_count_opt1,
+          AppLocalizations.of(context)!.q_people_count_opt2,
+          AppLocalizations.of(context)!.q_people_count_opt3
+        ]
+      },
+    ];
+
+    if (_currentQuestionIndex < questions.length) {
       setState(() => _isTyping = true);
       Future.delayed(const Duration(seconds: 1), () {
         if (mounted) {
@@ -68,16 +113,16 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
             _isTyping = false;
             _messages.add({
               "isUser": false,
-              "text": _questions[_currentQuestionIndex]["text"],
-              "options": _questions[_currentQuestionIndex]["options"],
-              "id": _questions[_currentQuestionIndex]["id"]
+              "text": questions[_currentQuestionIndex]["text"],
+              "options": questions[_currentQuestionIndex]["options"],
+              "id": questions[_currentQuestionIndex]["id"]
             });
           });
         }
       });
     } else {
       setState(() => _isFinalized = true);
-      _addAssistantMessage("Thank you. I have all the intelligence needed. Your report is ready for secure transmission.");
+      _addAssistantMessage(AppLocalizations.of(context)!.assistantThanks);
     }
   }
 
@@ -95,6 +140,10 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
     setState(() => _isUploading = true);
     try {
       final String reportId = "ADAR-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}";
+      
+      final prefs = await SharedPreferences.getInstance();
+      final String userId = prefs.getString('anon_id') ?? "Unknown";
+
       Map<String, String> evidenceUrls = {};
       final supabase = Supabase.instance.client;
 
@@ -106,6 +155,7 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
 
       await FirebaseFirestore.instance.collection('reports').doc(reportId).set({
         'reportId': reportId,
+        'userId': userId,
         'description': widget.description,
         'location': widget.location,
         'incidentDate': widget.incidentDate != null ? DateFormat('yyyy-MM-dd').format(widget.incidentDate!) : null,
@@ -142,7 +192,7 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1B2A),
-        title: const Text("Intelligence Assistant", style: TextStyle(fontSize: 18)),
+        title: Text(AppLocalizations.of(context)!.assistantTitle, style: const TextStyle(fontSize: 18)),
         elevation: 0,
       ),
       body: Column(
@@ -175,7 +225,7 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
         onPressed: _isUploading ? null : _submitEverything,
         child: _isUploading
             ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : const Text("FINALIZE & SUBMIT REPORT", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            : Text(AppLocalizations.of(context)!.finalizeSubmit, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
       ),
     );
   }
@@ -226,7 +276,7 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.symmetric(vertical: 5),
         decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(15)),
-        child: const Text("Assistant is analyzing...", style: TextStyle(color: Colors.white38, fontSize: 12, fontStyle: FontStyle.italic)),
+        child: Text(AppLocalizations.of(context)!.assistantTyping, style: const TextStyle(color: Colors.white38, fontSize: 12, fontStyle: FontStyle.italic)),
       ),
     );
   }

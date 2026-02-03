@@ -5,12 +5,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
+import 'package:adar/l10n/app_localizations.dart';
 
 // Internal Project Imports - Ensure these match your folder structure
 import 'package:adar/widgets/map_picker.dart';
 import 'package:adar/screens/intelligent_reporter_chat.dart';
 
-/// Screen responsible for capturing initial incident intelligence.
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
 
@@ -22,7 +22,7 @@ class _ReportScreenState extends State<ReportScreen> {
   // --- State Management ---
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
-  String _locationText = "Tap to get location";
+  String? _locationText;
   bool _isLoadingLocation = false;
 
   File? _selectedImage;
@@ -83,13 +83,17 @@ class _ReportScreenState extends State<ReportScreen> {
 
   void _navigateToChat() {
     _dismissKeyboard();
+    
+    // We check against the localized string or just null/empty checks
+    final locText = _locationText ?? AppLocalizations.of(context)!.tapToGetLocation;
+    final isLocationSet = _locationText != null; // Simpler check
 
     final bool isValid = _descController.text.trim().isNotEmpty &&
         (_selectedImage != null || _selectedVideo != null) &&
-        _locationText != "Tap to get location";
+        isLocationSet;
 
     if (!isValid) {
-      _showSnackBar("Please provide Description, Evidence, and Location.", isError: true);
+      _showSnackBar(AppLocalizations.of(context)!.fillAllFieldsError, isError: true);
       return;
     }
 
@@ -98,7 +102,7 @@ class _ReportScreenState extends State<ReportScreen> {
       MaterialPageRoute(
         builder: (context) => IntelligentReporterChat(
           description: _descController.text.trim(),
-          location: _locationText,
+          location: locText,
           incidentDate: _selectedDate,
           incidentTime: _selectedTime,
           imageFile: _selectedImage,
@@ -127,7 +131,7 @@ class _ReportScreenState extends State<ReportScreen> {
         backgroundColor: Colors.black,
         appBar: AppBar(
           backgroundColor: const Color(0xFF0D1B2A),
-          title: const Text("Submit Report", style: TextStyle(color: Colors.white)),
+          title: Text(AppLocalizations.of(context)!.submitReportTitle, style: const TextStyle(color: Colors.white)),
           elevation: 0,
         ),
         body: SingleChildScrollView(
@@ -135,7 +139,7 @@ class _ReportScreenState extends State<ReportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader("Description *"),
+              _buildSectionHeader(AppLocalizations.of(context)!.descriptionLabel),
               const SizedBox(height: 8),
               _buildDescriptionField(),
               const SizedBox(height: 20),
@@ -143,7 +147,7 @@ class _ReportScreenState extends State<ReportScreen> {
               const SizedBox(height: 20),
               _buildLocationRow(),
               const SizedBox(height: 30),
-              _buildSectionHeader("Evidence *", color: Colors.white),
+              _buildSectionHeader(AppLocalizations.of(context)!.evidenceLabel, color: Colors.white),
               const SizedBox(height: 15),
               _buildEvidenceButtons(),
               if (_selectedImage != null) _buildImagePreview(),
@@ -165,15 +169,15 @@ class _ReportScreenState extends State<ReportScreen> {
     return TextField(
       controller: _descController,
       maxLines: 4,
-      // This ensures the "Done" button appears on the keyboard
+
       textInputAction: TextInputAction.done,
-      // This hides the keyboard automatically when "Done" is pressed
+
       onSubmitted: (_) => _dismissKeyboard(),
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
-        hintText: "What did you see? (e.g., Person hiding a package...)",
+        hintText: AppLocalizations.of(context)!.descriptionHint,
         hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
-        helperText: "Tip: Include clothing, physical features, or specific actions.",
+        helperText: AppLocalizations.of(context)!.descriptionHelper,
         helperStyle: const TextStyle(color: Colors.blueGrey, fontSize: 11),
         filled: true,
         fillColor: Colors.white10,
@@ -190,7 +194,7 @@ class _ReportScreenState extends State<ReportScreen> {
       children: [
         Expanded(
           child: _buildPickerBox(
-            label: "Date",
+            label: AppLocalizations.of(context)!.dateLabel,
             value: _selectedDate == null ? "Select" : DateFormat('dd/MM/yy').format(_selectedDate!),
             onTap: () => _selectDate(context),
           ),
@@ -198,7 +202,7 @@ class _ReportScreenState extends State<ReportScreen> {
         const SizedBox(width: 15),
         Expanded(
           child: _buildPickerBox(
-            label: "Time",
+            label: AppLocalizations.of(context)!.timeLabel,
             value: _selectedTime == null ? "Select" : _selectedTime!.format(context),
             onTap: () => _selectTime(context),
           ),
@@ -210,9 +214,9 @@ class _ReportScreenState extends State<ReportScreen> {
   Widget _buildEvidenceButtons() {
     return Row(
       children: [
-        _buildEvidenceButton(Icons.camera_alt, "Photo", Colors.blue, () => _showPicker("Photo", _pickPhoto)),
+        _buildEvidenceButton(Icons.camera_alt, AppLocalizations.of(context)!.photoButton, Colors.blue, () => _showPicker("Photo", _pickPhoto)),
         const SizedBox(width: 20),
-        _buildEvidenceButton(Icons.videocam, "Video", Colors.blueGrey, () => _showPicker("Video", _pickVideo)),
+        _buildEvidenceButton(Icons.videocam, AppLocalizations.of(context)!.videoButton, Colors.blueGrey, () => _showPicker("Video", _pickVideo)),
       ],
     );
   }
@@ -225,7 +229,7 @@ class _ReportScreenState extends State<ReportScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
       onPressed: _navigateToChat,
-      child: const Text("Continue to Assistant", style: TextStyle(fontSize: 18, color: Colors.white)),
+      child: Text(AppLocalizations.of(context)!.continueToAssistant, style: const TextStyle(fontSize: 18, color: Colors.white)),
     );
   }
 
@@ -288,6 +292,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Widget _buildLocationRow() {
     return InkWell(onTap: _isLoadingLocation ? null : _getCurrentLocation, child: Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
-        child: Row(children: [Icon(_isLoadingLocation ? Icons.hourglass_top : Icons.location_on, color: Colors.blue), const SizedBox(width: 10), Expanded(child: Text(_locationText, style: const TextStyle(color: Colors.white70), overflow: TextOverflow.ellipsis)), const Icon(Icons.chevron_right, color: Colors.white70)])));
+        child: Row(children: [Icon(_isLoadingLocation ? Icons.hourglass_top : Icons.location_on, color: Colors.blue), const SizedBox(width: 10), Expanded(child: Text(_locationText ?? AppLocalizations.of(context)!.tapToGetLocation, style: const TextStyle(color: Colors.white70), overflow: TextOverflow.ellipsis)), const Icon(Icons.chevron_right, color: Colors.white70)])));
   }
 }
