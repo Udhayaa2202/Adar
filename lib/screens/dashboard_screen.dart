@@ -23,6 +23,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _fetchData();
+    _searchController.addListener(() {
+      setState(() {});
+    });
     _searchFocusNode.addListener(() {
       setState(() {
         _isSearching = _searchFocusNode.hasFocus;
@@ -42,7 +45,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) {
       setState(() {
         _anonymousId = prefs.getString('anon_id') ?? "Unknown";
-        _trustScore = (prefs.getDouble('trust_score') ?? 4.0).toStringAsFixed(1);
+        double currentScore = prefs.getDouble('trust_score') ?? 0.0;
+        if (currentScore == 4.0) {
+          currentScore = 0.0;
+          prefs.setDouble('trust_score', currentScore);
+        }
+        _trustScore = currentScore.toStringAsFixed(1);
       });
     }
   }
@@ -105,7 +113,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () {
-               // Navigate entirely back to the start
                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
             },
           ),
@@ -150,21 +157,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
               focusNode: _searchFocusNode,
               keyboardType: TextInputType.number,
               maxLength: 6,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white, fontSize: 16),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: const Color(0xFF0D1B2A),
                 hintText: AppLocalizations.of(context)!.searchHint,
-                hintStyle: const TextStyle(color: Colors.white54),
-                prefixText: "ADAR-",
-                prefixStyle: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.search, color: Colors.blue),
-                  onPressed: _handleSearch,
-                ),
+                hintStyle: const TextStyle(color: Colors.white54, fontSize: 16),
+                prefixIcon: (_isSearching || _searchController.text.isNotEmpty)
+                    ? Container(
+                        width: 60,
+                        alignment: Alignment.center,
+                        margin: const EdgeInsets.only(left: 10),
+                        child: const Text("ADAR-",
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16)),
+                      )
+                    : null,
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close, color: Colors.blue),
+                        onPressed: () {
+                          _searchController.clear();
+                        },
+                      )
+                    : null,
                 counterText: "",
-                // Hides the character counter
+
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(15),
                   borderSide: BorderSide.none,
@@ -199,7 +219,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snapshot.hasError) {
-                    // Provide a cleaner error if something else goes wrong
                     return Center(child: Text('Error loading reports: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
                   }
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -215,33 +234,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     );
                   }
 
-                  final reports = snapshot.data!.docs;
-                  
-                  // Sort locally to avoid creating a Firestore composite index
+                  var reports = snapshot.data!.docs;
+
+                  if (_searchController.text.isNotEmpty) {
+                    final query = _searchController.text.trim().toUpperCase();
+                    reports = reports.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final id = (data['reportId'] ?? data['id'] ?? '').toString().toUpperCase();
+                      return id.contains(query) || id.replaceAll('ADAR-', '').contains(query);
+                    }).toList();
+                  }
+
                   reports.sort((a, b) {
                     final aData = a.data() as Map<String, dynamic>;
                     final bData = b.data() as Map<String, dynamic>;
-                    
-                    // Handle Timestamp or String dates if legacy
+
                     dynamic getTimestamp(Map<String, dynamic> data) {
                        if (data['createdAt'] is Timestamp) {
                          return (data['createdAt'] as Timestamp).toDate();
                        }
-                       // Fallback for mock data or string dates if any
                        return DateTime.now(); 
                     }
 
                     final aTime = getTimestamp(aData);
                     final bTime = getTimestamp(bData);
                     
-                    return bTime.compareTo(aTime); // Descending
+                    return bTime.compareTo(aTime);
                   });
 
                   return ListView.builder(
                     itemCount: reports.length,
                     itemBuilder: (context, index) {
                       final reportData = reports[index].data() as Map<String, dynamic>;
-                      // Handle legacy mock data structure compatibility if needed, though we are writing fresh
                       final String reportId = reportData['reportId'] ?? reportData['id'] ?? 'Unknown ID';
                       final String status = reportData['status'] ?? 'PENDING';
                       
@@ -305,11 +329,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15)),
               ),
-              onPressed: _isSearching
+              onPressed: _searchController.text.isNotEmpty
                   ? _handleSearch
-                  : () => Navigator.pushNamed(context, '/report'),
+                  : () {
+                      _searchFocusNode.unfocus();
+                      Navigator.pushNamed(context, '/report');
+                    },
               child: Text(
-                  _isSearching ? AppLocalizations.of(context)!.searchButton : AppLocalizations.of(context)!.startNewReport,
+                  _searchController.text.isNotEmpty
+                      ? AppLocalizations.of(context)!.searchButton
+                      : AppLocalizations.of(context)!.startNewReport,
                   style: const TextStyle(
                       color: Colors.white, fontWeight: FontWeight.bold)),
             ),
