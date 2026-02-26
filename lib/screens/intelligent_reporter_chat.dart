@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:adar/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:adar/services/media_service.dart';
 import 'report_success_screen.dart';
 
 class IntelligentReporterChat extends StatefulWidget {
@@ -148,35 +149,72 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
       // --- 1. UPLOAD IMAGE TO SUPABASE ---
       if (widget.imageFile != null) {
         final path = 'evidence/$reportId/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        debugPrint("LOG: Attempting upload to app_evidence bucket...");
-
+        debugPrint("LOG: Anonymizing image...");
+        
         try {
-          final bytes = await widget.imageFile!.readAsBytes();
+          final processedImage = await MediaService.processImage(widget.imageFile!);
+          if (processedImage != null) {
+            debugPrint("LOG: Attempting upload to app_evidence bucket...");
+            final bytes = await processedImage.readAsBytes();
 
-          await supabase.storage
-              .from('app_evidence')
-              .uploadBinary(
-            path,
-            bytes,
-            fileOptions: const FileOptions(
-              contentType: 'image/jpeg',
-              upsert: true,
-            ),
-          )
-              .timeout(const Duration(seconds: 120));
+            await supabase.storage
+                .from('app_evidence')
+                .uploadBinary(
+              path,
+              bytes,
+              fileOptions: const FileOptions(
+                contentType: 'image/jpeg',
+                upsert: true,
+              ),
+            )
+                .timeout(const Duration(seconds: 120));
 
-          final String publicUrl = supabase.storage.from('app_evidence').getPublicUrl(path);
-          evidenceUrls['image'] = publicUrl;
-          debugPrint("LOG: Supabase Upload Successful: $publicUrl");
+            final String publicUrl = supabase.storage.from('app_evidence').getPublicUrl(path);
+            evidenceUrls['image'] = publicUrl;
+            debugPrint("LOG: Supabase Image Upload Successful: $publicUrl");
+          }
         } on TimeoutException {
-          debugPrint("LOG ERROR: Supabase upload timed out after 120 seconds.");
-          // We continue to Firestore so the text report isn't lost
+          debugPrint("LOG ERROR: Supabase image upload timed out after 120 seconds.");
         } catch (uploadError) {
-          debugPrint("LOG ERROR: Supabase upload failed: $uploadError");
+          debugPrint("LOG ERROR: Supabase image upload failed: $uploadError");
         }
       }
 
-      // --- 2. SAVE METADATA TO FIREBASE ---
+      // --- 2. UPLOAD VIDEO TO SUPABASE ---
+      if (widget.videoFile != null) {
+        final path = 'evidence/$reportId/vid_${DateTime.now().millisecondsSinceEpoch}.mp4';
+        debugPrint("LOG: Anonymizing video...");
+
+        try {
+          final processedVideo = await MediaService.processVideo(widget.videoFile!);
+          if (processedVideo != null) {
+            debugPrint("LOG: Attempting upload to app_evidence bucket...");
+            final bytes = await processedVideo.readAsBytes();
+
+            await supabase.storage
+                .from('app_evidence')
+                .uploadBinary(
+              path,
+              bytes,
+              fileOptions: const FileOptions(
+                contentType: 'video/mp4',
+                upsert: true,
+              ),
+            )
+                .timeout(const Duration(seconds: 180));
+
+            final String publicUrl = supabase.storage.from('app_evidence').getPublicUrl(path);
+            evidenceUrls['video'] = publicUrl;
+            debugPrint("LOG: Supabase Video Upload Successful: $publicUrl");
+          }
+        } on TimeoutException {
+          debugPrint("LOG ERROR: Supabase video upload timed out after 180 seconds.");
+        } catch (uploadError) {
+          debugPrint("LOG ERROR: Supabase video upload failed: $uploadError");
+        }
+      }
+
+      // --- 3. SAVE METADATA TO FIREBASE ---
       debugPrint("LOG: Saving to Firestore...");
       await FirebaseFirestore.instance.collection('reports').doc(reportId).set({
         'reportId': reportId,
@@ -201,6 +239,8 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
           SnackBar(content: Text("Submission Error: $e"), backgroundColor: Colors.red),
         );
       }
+    } finally {
+      MediaService.dispose();
     }
   }
 

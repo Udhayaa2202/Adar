@@ -182,7 +182,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const SizedBox(height: 10),
 
-            // Action Button (Dynamic: Search or New Report)
             _buildMainActionButton(),
             const SizedBox(height: 20),
           ],
@@ -341,7 +340,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _buildDetailRow("Location", report['location'] ?? "Not provided"),
               _buildDetailRow("Description", report['description'] ?? "No description provided"),
 
-              if (report['evidenceUrls'] != null && report['evidenceUrls']['image'] != null)
+              if (report['evidenceUrls'] != null &&
+                  report['evidenceUrls']['image'] != null &&
+                  report['status']?.toString().toUpperCase() != 'VERIFIED' &&
+                  report['status']?.toString().toUpperCase() != 'REJECTED')
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: ClipRRect(
