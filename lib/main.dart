@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:adar/l10n/app_localizations.dart';
 
-// Import your screens (ensure these paths match your project structure)
 import 'screens/report_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -15,15 +14,28 @@ import 'providers/language_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 1. Load environment variables
   await dotenv.load(fileName: ".env");
 
   // 2. Initialize Firebase
   await Firebase.initializeApp();
+  debugPrint("✅ LOG: Firebase initialized");
 
-  // 3. Initialize Supabase using the hidden keys from .env
+
+  // 3. Debug Check: Verify if .env is actually loading before initializing Supabase
+  final String supabaseUrl = dotenv.env['SUPABASEURL'] ?? '';
+  final String supabaseAnonKey = dotenv.env['SUPABASEANONKEY'] ?? '';
+
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    debugPrint("🚨 CRITICAL ERROR: Supabase keys are missing from .env file!");
+  } else {
+    debugPrint("✅ LOG: Supabase initialized with project: ${supabaseUrl.split('//').last}");
+  }
+
+  // 4. Initialize Supabase
   await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL'] ?? '',
-    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
   );
 
   runApp(
@@ -59,12 +71,10 @@ class AdarApp extends StatelessWidget {
             brightness: Brightness.dark,
             primarySwatch: Colors.blue,
           ),
-          // 1. Change home to HomeScreen
           home: const HomeScreen(),
-
           routes: {
-              '/dashboard': (context) => const DashboardScreen(),
-              '/report': (context) => const ReportScreen(),
+            '/dashboard': (context) => const DashboardScreen(),
+            '/report': (context) => const ReportScreen(),
           },
         );
       },

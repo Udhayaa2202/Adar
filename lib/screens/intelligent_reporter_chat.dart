@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -40,7 +41,6 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
   @override
   void initState() {
     super.initState();
-    // We delay the start chat to ensure context is available for localization
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startChat();
     });
@@ -57,7 +57,6 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
   }
 
   void _askNextQuestion() {
-    // We fetch questions dynamically to ensure they are localized
     final List<Map<String, dynamic>> questions = [
       {
         "id": "frequency",
@@ -138,21 +137,47 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
 
   Future<void> _submitEverything() async {
     setState(() => _isUploading = true);
+    final supabase = Supabase.instance.client;
+
     try {
       final String reportId = "ADAR-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}";
-      
       final prefs = await SharedPreferences.getInstance();
       final String userId = prefs.getString('anon_id') ?? "Unknown";
-
       Map<String, String> evidenceUrls = {};
-      final supabase = Supabase.instance.client;
 
+      // --- 1. UPLOAD IMAGE TO SUPABASE ---
       if (widget.imageFile != null) {
         final path = 'evidence/$reportId/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        await supabase.storage.from('reports').upload(path, widget.imageFile!);
-        evidenceUrls['image'] = supabase.storage.from('reports').getPublicUrl(path);
+        debugPrint("LOG: Attempting upload to app_evidence bucket...");
+
+        try {
+          final bytes = await widget.imageFile!.readAsBytes();
+
+          await supabase.storage
+              .from('app_evidence')
+              .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          )
+              .timeout(const Duration(seconds: 120));
+
+          final String publicUrl = supabase.storage.from('app_evidence').getPublicUrl(path);
+          evidenceUrls['image'] = publicUrl;
+          debugPrint("LOG: Supabase Upload Successful: $publicUrl");
+        } on TimeoutException {
+          debugPrint("LOG ERROR: Supabase upload timed out after 120 seconds.");
+          // We continue to Firestore so the text report isn't lost
+        } catch (uploadError) {
+          debugPrint("LOG ERROR: Supabase upload failed: $uploadError");
+        }
       }
 
+      // --- 2. SAVE METADATA TO FIREBASE ---
+      debugPrint("LOG: Saving to Firestore...");
       await FirebaseFirestore.instance.collection('reports').doc(reportId).set({
         'reportId': reportId,
         'userId': userId,
@@ -169,10 +194,11 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
       if (!mounted) return;
       _navigateToSuccess(reportId);
     } catch (e) {
+      debugPrint("LOG CRITICAL ERROR: $e");
       if (mounted) {
         setState(() => _isUploading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+          SnackBar(content: Text("Submission Error: $e"), backgroundColor: Colors.red),
         );
       }
     }
@@ -224,7 +250,11 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
         ),
         onPressed: _isUploading ? null : _submitEverything,
         child: _isUploading
-            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            ? const SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+        )
             : Text(AppLocalizations.of(context)!.finalizeSubmit, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
       ),
     );

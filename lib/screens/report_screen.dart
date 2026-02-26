@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:adar/l10n/app_localizations.dart';
 
-// Internal Project Imports - Ensure these match your folder structure
 import 'package:adar/widgets/map_picker.dart';
 import 'package:adar/screens/intelligent_reporter_chat.dart';
 
@@ -19,7 +18,7 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
-  // --- State Management ---
+
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   String? _locationText;
@@ -38,8 +37,6 @@ class _ReportScreenState extends State<ReportScreen> {
     _descController.dispose();
     super.dispose();
   }
-
-  // --- Logic Layer ---
 
   void _dismissKeyboard() {
     FocusScopeNode currentFocus = FocusScope.of(context);
@@ -83,8 +80,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   void _navigateToChat() {
     _dismissKeyboard();
-    
-    // We check against the localized string or just null/empty checks
+
     final locText = _locationText ?? AppLocalizations.of(context)!.tapToGetLocation;
     final isLocationSet = _locationText != null; // Simpler check
 
