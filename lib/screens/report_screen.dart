@@ -93,6 +93,11 @@ class _ReportScreenState extends State<ReportScreen> {
       return;
     }
 
+    if (_isFuture(_selectedDate, _selectedTime)) {
+      _showSnackBar(AppLocalizations.of(context)!.futureDateError, isError: true);
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -244,13 +249,47 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2024), lastDate: DateTime(2030));
-    if (picked != null) setState(() => _selectedDate = picked);
+    final DateTime? picked = await showDatePicker(
+      context: context, 
+      initialDate: _selectedDate ?? DateTime.now(), 
+      firstDate: DateTime(2024), 
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        if (_isFuture(_selectedDate, _selectedTime)) {
+          _selectedTime = null;
+        }
+      });
+    }
   }
 
   Future<void> _selectTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-    if (picked != null) setState(() => _selectedTime = picked);
+    final TimeOfDay? picked = await showTimePicker(
+      context: context, 
+      initialTime: _selectedTime ?? TimeOfDay.now(),
+    );
+    if (picked != null) {
+      if (_isFuture(_selectedDate ?? DateTime.now(), picked)) {
+        _showSnackBar(AppLocalizations.of(context)!.futureDateError, isError: true);
+        return;
+      }
+      setState(() => _selectedTime = picked);
+    }
+  }
+
+  bool _isFuture(DateTime? date, TimeOfDay? time) {
+    if (date == null || time == null) return false;
+    final now = DateTime.now();
+    final selectedDateTime = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    return selectedDateTime.isAfter(now);
   }
 
   void _showPicker(String title, Function(ImageSource) onPick) {

@@ -214,4 +214,7 @@ class AppLocalizationsTa extends AppLocalizations {
   @override
   String get assistantThanks =>
       'நன்றி. எனக்கு தேவையான அனைத்து உளவுத்துறை தகவல்களும் கிடைத்துள்ளன. உங்கள் புகார் பாதுகாப்பான பரிமாற்றத்திற்கு தயாராக உள்ளது.';
+
+  @override
+  String get futureDateError => 'சம்பவ நேரம் எதிர்காலத்தில் இருக்க முடியாது';
 }

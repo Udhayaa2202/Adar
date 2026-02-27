@@ -70,5 +70,6 @@
   "q_people_count_opt1": "1-2 people",
   "q_people_count_opt2": "Small group (3-5)",
   "q_people_count_opt3": "Large crowd",
-  "assistantThanks": "Thank you. I have all the intelligence needed. Your report is ready for secure transmission."
+  "assistantThanks": "Thank you. I have all the intelligence needed. Your report is ready for secure transmission.",
+  "futureDateError": "Incident time cannot be in the future"
 }

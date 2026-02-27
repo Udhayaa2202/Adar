@@ -213,4 +213,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get assistantThanks =>
       'Thank you. I have all the intelligence needed. Your report is ready for secure transmission.';
+
+  @override
+  String get futureDateError => 'Incident time cannot be in the future';
 }

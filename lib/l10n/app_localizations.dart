@@ -487,6 +487,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Thank you. I have all the intelligence needed. Your report is ready for secure transmission.'**
   String get assistantThanks;
+
+  /// No description provided for @futureDateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Incident time cannot be in the future'**
+  String get futureDateError;
 }
 
 class _AppLocalizationsDelegate
