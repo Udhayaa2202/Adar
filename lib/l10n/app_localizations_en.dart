@@ -216,4 +216,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get futureDateError => 'Incident time cannot be in the future';
+
+  @override
+  String get aboutTrustScore => 'About trust score';
+
+  @override
+  String get trustScoreInfoTitle => 'Trust Score System';
+
+  @override
+  String get trustScoreCriteria =>
+      'Our algorithm evaluates reports based on several signals:\n\n• Description Detail: Detailed reports gain more trust.\n• Evidence Quality: Providing both photos and videos increases the score.\n• Incident Recency: Reporting incidents quickly ensures higher accuracy.\n\nA score of 100 indicates a highly reliable report.';
+
+  @override
+  String get reportTrustScore => 'Report Trust Score';
 }

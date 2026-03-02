@@ -71,5 +71,9 @@
   "q_people_count_opt2": "Small group (3-5)",
   "q_people_count_opt3": "Large crowd",
   "assistantThanks": "Thank you. I have all the intelligence needed. Your report is ready for secure transmission.",
-  "futureDateError": "Incident time cannot be in the future"
+  "futureDateError": "Incident time cannot be in the future",
+  "aboutTrustScore": "About trust score",
+  "trustScoreInfoTitle": "Trust Score System",
+  "trustScoreCriteria": "Our algorithm evaluates reports based on several signals:\n\n• Description Detail: Detailed reports gain more trust.\n• Evidence Quality: Providing both photos and videos increases the score.\n• Incident Recency: Reporting incidents quickly ensures higher accuracy.\n\nA score of 100 indicates a highly reliable report.",
+  "reportTrustScore": "Report Trust Score"
 }

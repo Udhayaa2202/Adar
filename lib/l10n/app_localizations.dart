@@ -493,6 +493,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Incident time cannot be in the future'**
   String get futureDateError;
+
+  /// No description provided for @aboutTrustScore.
+  ///
+  /// In en, this message translates to:
+  /// **'About trust score'**
+  String get aboutTrustScore;
+
+  /// No description provided for @trustScoreInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trust Score System'**
+  String get trustScoreInfoTitle;
+
+  /// No description provided for @trustScoreCriteria.
+  ///
+  /// In en, this message translates to:
+  /// **'Our algorithm evaluates reports based on several signals:\n\n• Description Detail: Detailed reports gain more trust.\n• Evidence Quality: Providing both photos and videos increases the score.\n• Incident Recency: Reporting incidents quickly ensures higher accuracy.\n\nA score of 100 indicates a highly reliable report.'**
+  String get trustScoreCriteria;
+
+  /// No description provided for @reportTrustScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Report Trust Score'**
+  String get reportTrustScore;
 }
 
 class _AppLocalizationsDelegate

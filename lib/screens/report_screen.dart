@@ -18,11 +18,14 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
-
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   String? _locationText;
   bool _isLoadingLocation = false;
+
+  // --- TRUST SCORE TRACKERS ---
+  bool _isFromGallery = false;
+  bool _isMockLocation = false;
 
   File? _selectedImage;
   File? _selectedVideo;
@@ -45,6 +48,7 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+  /// Handles GPS capture and checks for Mock Location (Fake GPS)
   Future<void> _getCurrentLocation() async {
     _dismissKeyboard();
     setState(() => _isLoadingLocation = true);
@@ -58,6 +62,15 @@ class _ReportScreenState extends State<ReportScreen> {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+
+      // --- SCORING CHECK: DETECTION OF FAKE GPS ---
+      setState(() {
+        _isMockLocation = position.isMocked;
+      });
+
+      if (_isMockLocation) {
+        _showSnackBar("Security Note: Automated location verification flagged.", isError: true);
+      }
 
       if (!mounted) return;
 
@@ -78,11 +91,12 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+  /// Navigates to the AI Chat screen, passing all captured data and trust signals
   void _navigateToChat() {
     _dismissKeyboard();
 
     final locText = _locationText ?? AppLocalizations.of(context)!.tapToGetLocation;
-    final isLocationSet = _locationText != null; // Simpler check
+    final isLocationSet = _locationText != null;
 
     final bool isValid = _descController.text.trim().isNotEmpty &&
         (_selectedImage != null || _selectedVideo != null) &&
@@ -98,6 +112,7 @@ class _ReportScreenState extends State<ReportScreen> {
       return;
     }
 
+    // --- INTEGRATION: PASSING TRUST SIGNALS TO THE NEXT STAGE ---
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -108,6 +123,8 @@ class _ReportScreenState extends State<ReportScreen> {
           incidentTime: _selectedTime,
           imageFile: _selectedImage,
           videoFile: _selectedVideo,
+          isFromGallery: _isFromGallery,
+          isMocked: _isMockLocation,
         ),
       ),
     );
@@ -121,8 +138,6 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
     );
   }
-
-  // --- UI Components ---
 
   @override
   Widget build(BuildContext context) {
@@ -170,9 +185,7 @@ class _ReportScreenState extends State<ReportScreen> {
     return TextField(
       controller: _descController,
       maxLines: 4,
-
       textInputAction: TextInputAction.done,
-
       onSubmitted: (_) => _dismissKeyboard(),
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
@@ -235,11 +248,21 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
-    final XFile? file = await _picker.pickImage(source: source, imageQuality: 70);
+    // TRACK SOURCE FOR TRUST SCORING
+    _isFromGallery = (source == ImageSource.gallery);
+
+    final XFile? file = await _picker.pickImage(
+      source: source,
+      imageQuality: 50,
+      maxWidth: 1920,
+    );
     if (file != null) setState(() => _selectedImage = File(file.path));
   }
 
   Future<void> _pickVideo(ImageSource source) async {
+    // TRACK SOURCE FOR TRUST SCORING
+    _isFromGallery = (source == ImageSource.gallery);
+
     final XFile? file = await _picker.pickVideo(source: source);
     if (file != null) {
       _selectedVideo = File(file.path);
@@ -250,9 +273,9 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
-      context: context, 
-      initialDate: _selectedDate ?? DateTime.now(), 
-      firstDate: DateTime(2024), 
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(2024),
       lastDate: DateTime.now(),
     );
     if (picked != null) {
@@ -267,7 +290,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay? picked = await showTimePicker(
-      context: context, 
+      context: context,
       initialTime: _selectedTime ?? TimeOfDay.now(),
     );
     if (picked != null) {
@@ -283,38 +306,177 @@ class _ReportScreenState extends State<ReportScreen> {
     if (date == null || time == null) return false;
     final now = DateTime.now();
     final selectedDateTime = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
+      date.year, date.month, date.day,
+      time.hour, time.minute,
     );
     return selectedDateTime.isAfter(now);
   }
 
   void _showPicker(String title, Function(ImageSource) onPick) {
-    showModalBottomSheet(context: context, backgroundColor: const Color(0xFF0D1B2A), builder: (context) => Column(mainAxisSize: MainAxisSize.min, children: [
-      ListTile(leading: const Icon(Icons.camera, color: Colors.blue), title: Text("Take $title", style: const TextStyle(color: Colors.white)), onTap: () { Navigator.pop(context); onPick(ImageSource.camera); }),
-      ListTile(leading: const Icon(Icons.image, color: Colors.blue), title: Text("From Gallery", style: const TextStyle(color: Colors.white)), onTap: () { Navigator.pop(context); onPick(ImageSource.gallery); }),
-    ]));
+    showModalBottomSheet(
+        context: context,
+        backgroundColor: const Color(0xFF0D1B2A),
+        builder: (context) => Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+              leading: const Icon(Icons.camera, color: Colors.blue),
+              title: Text("Take $title", style: const TextStyle(color: Colors.white)),
+              onTap: () { Navigator.pop(context); onPick(ImageSource.camera); }
+          ),
+          ListTile(
+              leading: const Icon(Icons.image, color: Colors.blue),
+              title: Text("From Gallery", style: const TextStyle(color: Colors.white)),
+              onTap: () { Navigator.pop(context); onPick(ImageSource.gallery); }
+          ),
+        ])
+    );
   }
 
-  // --- Wrapper Widgets for Previews ---
-  Widget _buildImagePreview() => _previewWrapper(label: "Photo Proof", onDelete: () => setState(() => _selectedImage = null), child: Image.file(_selectedImage!, fit: BoxFit.cover));
+  void _viewImage() {
+    if (_selectedImage == null) return;
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: Image.file(_selectedImage!),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  Widget _buildVideoPreview() => _previewWrapper(label: "Video Proof", onDelete: () { _videoController?.pause(); setState(() { _selectedVideo = null; _videoController = null; }); },
+  void _viewVideo() {
+    if (_selectedVideo == null || _videoController == null) return;
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Dialog(
+            backgroundColor: Colors.black,
+            insetPadding: EdgeInsets.zero,
+            child: Stack(
+              children: [
+                Center(
+                  child: AspectRatio(
+                    aspectRatio: _videoController!.value.aspectRatio,
+                    child: VideoPlayer(_videoController!),
+                  ),
+                ),
+                Positioned(
+                  top: 40,
+                  right: 20,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.black54,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 50,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: CircleAvatar(
+                      backgroundColor: Colors.blueAccent.withValues(alpha: 0.8),
+                      radius: 30,
+                      child: IconButton(
+                        iconSize: 35,
+                        icon: Icon(
+                          _videoController!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            _videoController!.value.isPlaying
+                                ? _videoController!.pause()
+                                : _videoController!.play();
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+      ),
+    );
+  }
+
+  Widget _previewWrapper({required String label, required Widget child, required VoidCallback onDelete, required VoidCallback onView}) {
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(label, style: const TextStyle(color: Colors.blueAccent, fontSize: 13, fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: onView,
+                      child: const Icon(Icons.visibility_outlined, color: Colors.blueAccent, size: 20),
+                    ),
+                    const SizedBox(width: 15),
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(15)),
+            child: GestureDetector(
+              onTap: onView,
+              child: SizedBox(
+                height: 250,
+                width: double.infinity,
+                child: child,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePreview() => _previewWrapper(label: "Photo Proof", onDelete: () => setState(() => _selectedImage = null), onView: _viewImage, child: Image.file(_selectedImage!, fit: BoxFit.cover));
+
+  Widget _buildVideoPreview() => _previewWrapper(label: "Video Proof", onDelete: () { _videoController?.pause(); setState(() { _selectedVideo = null; _videoController = null; }); }, onView: _viewVideo,
       child: _videoController != null && _videoController!.value.isInitialized ? VideoPlayer(_videoController!) : const Center(child: CircularProgressIndicator())
   );
-
-  Widget _previewWrapper({required String label, required Widget child, required VoidCallback onDelete}) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(padding: const EdgeInsets.only(top: 20, bottom: 8), child: Text(label, style: const TextStyle(color: Colors.blue, fontSize: 12))),
-      Stack(children: [
-        Container(height: 200, width: double.infinity, decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), color: Colors.white10), child: ClipRRect(borderRadius: BorderRadius.circular(15), child: child)),
-        Positioned(right: 10, top: 10, child: GestureDetector(onTap: onDelete, child: const CircleAvatar(backgroundColor: Colors.black54, radius: 15, child: Icon(Icons.close, color: Colors.white, size: 18))))
-      ])
-    ]);
-  }
 
   Widget _buildPickerBox({required String label, required String value, required VoidCallback onTap}) {
     return InkWell(onTap: onTap, child: Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white24)),

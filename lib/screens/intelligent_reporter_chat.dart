@@ -16,6 +16,8 @@ class IntelligentReporterChat extends StatefulWidget {
   final TimeOfDay? incidentTime;
   final File? imageFile;
   final File? videoFile;
+  final bool isFromGallery;
+  final bool isMocked;
 
   const IntelligentReporterChat({
     super.key,
@@ -25,6 +27,8 @@ class IntelligentReporterChat extends StatefulWidget {
     this.incidentTime,
     this.imageFile,
     this.videoFile,
+    required this.isFromGallery,
+    required this.isMocked,
   });
 
   @override
@@ -146,76 +150,36 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
       final String userId = prefs.getString('anon_id') ?? "Unknown";
       Map<String, String> evidenceUrls = {};
 
-      // --- 1. UPLOAD IMAGE TO SUPABASE ---
+      // --- 1. UPLOAD IMAGE ---
       if (widget.imageFile != null) {
         final path = 'evidence/$reportId/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        debugPrint("LOG: Anonymizing image...");
-        
-        try {
-          final processedImage = await MediaService.processImage(widget.imageFile!);
-          if (processedImage != null) {
-            debugPrint("LOG: Attempting upload to app_evidence bucket...");
-            final bytes = await processedImage.readAsBytes();
-
-            await supabase.storage
-                .from('app_evidence')
-                .uploadBinary(
-              path,
-              bytes,
-              fileOptions: const FileOptions(
-                contentType: 'image/jpeg',
-                upsert: true,
-              ),
-            )
-                .timeout(const Duration(seconds: 120));
-
-            final String publicUrl = supabase.storage.from('app_evidence').getPublicUrl(path);
-            evidenceUrls['image'] = publicUrl;
-            debugPrint("LOG: Supabase Image Upload Successful: $publicUrl");
-          }
-        } on TimeoutException {
-          debugPrint("LOG ERROR: Supabase image upload timed out after 120 seconds.");
-        } catch (uploadError) {
-          debugPrint("LOG ERROR: Supabase image upload failed: $uploadError");
+        final processedImage = await MediaService.processImage(widget.imageFile!);
+        if (processedImage != null) {
+          final bytes = await processedImage.readAsBytes();
+          await supabase.storage.from('app_evidence').uploadBinary(path, bytes,
+              fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true));
+          evidenceUrls['image'] = supabase.storage.from('app_evidence').getPublicUrl(path);
         }
       }
 
-      // --- 2. UPLOAD VIDEO TO SUPABASE ---
+      // --- 2. UPLOAD VIDEO ---
       if (widget.videoFile != null) {
         final path = 'evidence/$reportId/vid_${DateTime.now().millisecondsSinceEpoch}.mp4';
-        debugPrint("LOG: Anonymizing video...");
-
-        try {
-          final processedVideo = await MediaService.processVideo(widget.videoFile!);
-          if (processedVideo != null) {
-            debugPrint("LOG: Attempting upload to app_evidence bucket...");
-            final bytes = await processedVideo.readAsBytes();
-
-            await supabase.storage
-                .from('app_evidence')
-                .uploadBinary(
-              path,
-              bytes,
-              fileOptions: const FileOptions(
-                contentType: 'video/mp4',
-                upsert: true,
-              ),
-            )
-                .timeout(const Duration(seconds: 180));
-
-            final String publicUrl = supabase.storage.from('app_evidence').getPublicUrl(path);
-            evidenceUrls['video'] = publicUrl;
-            debugPrint("LOG: Supabase Video Upload Successful: $publicUrl");
-          }
-        } on TimeoutException {
-          debugPrint("LOG ERROR: Supabase video upload timed out after 180 seconds.");
-        } catch (uploadError) {
-          debugPrint("LOG ERROR: Supabase video upload failed: $uploadError");
+        final processedVideo = await MediaService.processVideo(widget.videoFile!);
+        if (processedVideo != null) {
+          final bytes = await processedVideo.readAsBytes();
+          await supabase.storage.from('app_evidence').uploadBinary(path, bytes,
+              fileOptions: const FileOptions(contentType: 'video/mp4', upsert: true));
+          evidenceUrls['video'] = supabase.storage.from('app_evidence').getPublicUrl(path);
         }
       }
 
-      // --- 3. SAVE METADATA TO FIREBASE ---
-      debugPrint("LOG: Saving to Firestore...");
+      // --- 3. CALCULATE TRUST SCORE ---
+      final Map<String, dynamic> trustResult = _calculateTrustScore();
+      final int trustScore = trustResult['score'] as int;
+      final Map<String, dynamic> trustBreakdown = trustResult['breakdown'] as Map<String, dynamic>;
+
+      // --- 4. SAVE TO FIREBASE ---
       await FirebaseFirestore.instance.collection('reports').doc(reportId).set({
         'reportId': reportId,
         'userId': userId,
@@ -223,16 +187,22 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
         'location': widget.location,
         'incidentDate': widget.incidentDate != null ? DateFormat('yyyy-MM-dd').format(widget.incidentDate!) : null,
         'incidentTime': widget.incidentTime?.format(context),
+        'trustScore': trustScore,
+        'trustBreakdown': trustBreakdown,
+        'isFromGallery': widget.isFromGallery,
+        'isMocked': widget.isMocked,
         ..._answers,
         'evidenceUrls': evidenceUrls,
-        'status': 'Under Review',
+        'status': trustScore < 40 ? 'Flagged' : 'Under Review',
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // --- 5. UPDATE LOCAL PREFS (For Dashboard) ---
+      await prefs.setDouble('trust_score', trustScore.toDouble());
 
       if (!mounted) return;
       _navigateToSuccess(reportId);
     } catch (e) {
-      debugPrint("LOG CRITICAL ERROR: $e");
       if (mounted) {
         setState(() => _isUploading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -242,6 +212,176 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
     } finally {
       MediaService.dispose();
     }
+  }
+
+  /// Comprehensive trust scoring with breakdown for transparency
+  Map<String, dynamic> _calculateTrustScore() {
+    int score = 100;
+    Map<String, dynamic> breakdown = {};
+
+    // ============================================
+    // 1. GPS INTEGRITY (Critical — highest penalty)
+    // ============================================
+    if (widget.isMocked) {
+      score -= 30;
+      breakdown['mockGps'] = -30;
+    }
+
+    // ============================================
+    // 2. EVIDENCE SOURCE CHECK
+    // ============================================
+    if (widget.isFromGallery) {
+      score -= 10;
+      breakdown['gallerySource'] = -10;
+    }
+
+    // ============================================
+    // 3. EVIDENCE QUALITY — penalize missing pieces
+    // ============================================
+    if (widget.imageFile == null && widget.videoFile == null) {
+      // No evidence at all — should never happen due to validation, but handle it
+      score -= 15;
+      breakdown['noEvidence'] = -15;
+    } else if (widget.imageFile == null || widget.videoFile == null) {
+      // Only one type provided
+      score -= 5;
+      breakdown['partialEvidence'] = -5;
+    } else {
+      // Both photo + video = bonus for completeness
+      score += 5;
+      breakdown['fullEvidence'] = 5;
+    }
+
+    // ============================================
+    // 4. DESCRIPTION DEPTH — tiered analysis
+    // ============================================
+    final int descLen = widget.description.trim().length;
+    final int wordCount = widget.description.trim().split(RegExp(r'\s+')).length;
+
+    if (descLen < 15 || wordCount < 3) {
+      // Extremely short / likely spam
+      score -= 15;
+      breakdown['descriptionDepth'] = -15;
+    } else if (descLen < 30 || wordCount < 6) {
+      // Very brief
+      score -= 10;
+      breakdown['descriptionDepth'] = -10;
+    } else if (descLen < 60) {
+      // Acceptable but not detailed
+      score -= 5;
+      breakdown['descriptionDepth'] = -5;
+    } else {
+      // Good detail — reward
+      score += 5;
+      breakdown['descriptionDepth'] = 5;
+    }
+
+    // ============================================
+    // 5. DATE/TIME STALENESS CHECK
+    // ============================================
+    if (widget.incidentDate == null) {
+      // No date provided at all
+      score -= 10;
+      breakdown['noDate'] = -10;
+    } else {
+      final now = DateTime.now();
+      final daysDiff = now.difference(widget.incidentDate!).inDays;
+
+      if (widget.incidentTime == null) {
+        // Date provided but no time
+        score -= 5;
+        breakdown['noTime'] = -5;
+      }
+
+      if (daysDiff > 30) {
+        // Very old incident — high staleness
+        score -= 15;
+        breakdown['staleness'] = -15;
+      } else if (daysDiff > 7) {
+        // Somewhat old
+        score -= 10;
+        breakdown['staleness'] = -10;
+      } else if (daysDiff > 3) {
+        // Slightly delayed
+        score -= 5;
+        breakdown['staleness'] = -5;
+      }
+      // 0-3 days = fresh, no penalty
+    }
+
+    // ============================================
+    // 6. CHAT ANSWER ANALYSIS — detail & consistency
+    // ============================================
+    int answeredCount = _answers.length;
+
+    if (answeredCount < 5) {
+      // User skipped or didn't answer all questions (shouldn't happen in normal flow)
+      score -= 5;
+      breakdown['incompleteAnswers'] = -5;
+    }
+
+    // Cross-check: High detail answers boost score
+    int detailSignals = 0;
+
+    // Frequency: recurring incidents are more credible patterns
+    final freq = _answers['frequency'] ?? '';
+    if (freq.contains('Daily') || freq.contains('தினசரி')) {
+      detailSignals += 2;
+    } else if (freq.contains('Weekly') || freq.contains('வாராந்திரம்')) {
+      detailSignals += 1;
+    }
+
+    // Sensitive area: reports near schools/parks carry more weight
+    final sensitive = _answers['sensitive_area'] ?? '';
+    if (sensitive.contains('Yes') || sensitive.contains('மிக அருகில்')) {
+      detailSignals += 1;
+    }
+
+    // People count: more people = harder to fabricate
+    final people = _answers['people_count'] ?? '';
+    if (people.contains('group') || people.contains('crowd') ||
+        people.contains('குழு') || people.contains('கூட்டம்')) {
+      detailSignals += 1;
+    }
+
+    // Vehicles: vehicle involvement adds specificity
+    final vehicles = _answers['vehicles'] ?? '';
+    if (!vehicles.contains('None') && !vehicles.contains('இல்லை') && vehicles.isNotEmpty) {
+      detailSignals += 1;
+    }
+
+    // Award bonus for high detail (max +5)
+    if (detailSignals >= 4) {
+      score += 5;
+      breakdown['detailBonus'] = 5;
+    } else if (detailSignals >= 2) {
+      score += 3;
+      breakdown['detailBonus'] = 3;
+    }
+
+    // ============================================
+    // 7. LOCATION VALIDATION
+    // ============================================
+    final loc = widget.location;
+    if (loc.isEmpty || loc == 'Tap to get location' || loc == 'Unknown Location') {
+      score -= 10;
+      breakdown['invalidLocation'] = -10;
+    }
+
+    // ============================================
+    // 8. CONSISTENCY CROSS-CHECK
+    //    If gallery + mock GPS = likely fabricated
+    // ============================================
+    if (widget.isFromGallery && widget.isMocked) {
+      score -= 10;
+      breakdown['fabricationFlag'] = -10;
+    }
+
+    // Clamp to valid range
+    score = score.clamp(0, 100);
+    breakdown['finalScore'] = score;
+
+    return {'score': score, 'breakdown': breakdown};
   }
 
   void _navigateToSuccess(String id) {
@@ -290,11 +430,7 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
         ),
         onPressed: _isUploading ? null : _submitEverything,
         child: _isUploading
-            ? const SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-        )
+            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
             : Text(AppLocalizations.of(context)!.finalizeSubmit, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
       ),
     );

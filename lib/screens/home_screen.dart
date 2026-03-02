@@ -25,7 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ123456789';
       String newId = List.generate(8, (i) => chars[Random().nextInt(chars.length)]).join();
       await prefs.setString('anon_id', newId);
-      await prefs.setDouble('trust_score', 4.0);
+      await prefs.setDouble('trust_score', 100.0);
     }
 
     // Brief delay to show the "Secure Connection" loading effect
