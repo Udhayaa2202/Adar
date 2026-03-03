@@ -33,3 +33,5 @@ Thumbs.db
 *.ipr
 # Crash logs
 flutter_*.log
+# --- SUB-PROJECTS ---
+
