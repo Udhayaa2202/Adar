@@ -18,6 +18,9 @@ class IntelligentReporterChat extends StatefulWidget {
   final File? videoFile;
   final bool isFromGallery;
   final bool isMocked;
+  final Map<String, double>? capturedGps;
+  final double? incidentLat;
+  final double? incidentLon;
 
   const IntelligentReporterChat({
     super.key,
@@ -29,6 +32,9 @@ class IntelligentReporterChat extends StatefulWidget {
     this.videoFile,
     required this.isFromGallery,
     required this.isMocked,
+    this.capturedGps,
+    this.incidentLat,
+    this.incidentLon,
   });
 
   @override
@@ -150,12 +156,18 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
       final String userId = prefs.getString('anon_id') ?? "Unknown";
       Map<String, String> evidenceUrls = {};
 
-      // --- 1. UPLOAD IMAGE ---
+      // --- 1. UPLOAD IMAGE & CAPTURE METADATA ---
+      Map<String, double>? photoMetadata;
+      String? photoLocationSource;
       if (widget.imageFile != null) {
         final path = 'evidence/$reportId/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final processedImage = await MediaService.processImage(widget.imageFile!);
-        if (processedImage != null) {
-          final bytes = await processedImage.readAsBytes();
+        final result = await MediaService.processImage(widget.imageFile!, fallbackGps: widget.capturedGps);
+        if (result != null) {
+          final File processedFile = result['file'] as File;
+          photoMetadata = result['metadata'] as Map<String, double>?;
+          photoLocationSource = result['source'] as String?;
+          
+          final bytes = await processedFile.readAsBytes();
           await supabase.storage.from('app_evidence').uploadBinary(path, bytes,
               fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true));
           evidenceUrls['image'] = supabase.storage.from('app_evidence').getPublicUrl(path);
@@ -187,10 +199,14 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
         'location': widget.location,
         'incidentDate': widget.incidentDate != null ? DateFormat('yyyy-MM-dd').format(widget.incidentDate!) : null,
         'incidentTime': widget.incidentTime?.format(context),
+        'incidentLat': widget.incidentLat,
+        'incidentLon': widget.incidentLon,
         'trustScore': trustScore,
         'trustBreakdown': trustBreakdown,
         'isFromGallery': widget.isFromGallery,
         'isMocked': widget.isMocked,
+        'photoLocation': photoMetadata != null ? "${photoMetadata!['latitude']}, ${photoMetadata!['longitude']}" : null,
+        'photoLocationSource': photoLocationSource,
         ..._answers,
         'evidenceUrls': evidenceUrls,
         'status': trustScore < 40 ? 'Flagged' : 'Under Review',

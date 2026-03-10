@@ -4,18 +4,65 @@ import 'package:video_compress/video_compress.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:image/image.dart' as img;
+import 'package:exif/exif.dart';
 
 class MediaService {
-  /// Strips EXIF metadata and applies a "Safety Crop" (bottom 10%) to remove visual watermarks.
-  static Future<File?> processImage(File file) async {
+  /// Processes image: Extracts metadata, then applies a crop to remove watermarks.
+  /// Returns a Map containing the processed file and extracted GPS metadata.
+  static Future<Map<String, dynamic>?> processImage(File file, {Map<String, double>? fallbackGps}) async {
     try {
-      // 1. Load the image for cropping
       final bytes = await file.readAsBytes();
+
+      // --- 1. EXTRACT GPS METADATA USING A DEDICATED PACKAGE ---
+      Map<String, double>? gpsData;
+      final Map<String, IfdTag> exifData = await readExifFromBytes(bytes);
+
+      // Helper to find tags regardless of group prefix
+      IfdTag? findTag(List<String> variants) {
+        for (var v in variants) {
+          if (exifData.containsKey(v)) return exifData[v];
+        }
+        return null;
+      }
+
+      final latTag = findTag(['GPS GPSLatitude', 'GPS Latitude', 'Latitude']);
+      final lonTag = findTag(['GPS GPSLongitude', 'GPS Longitude', 'Longitude']);
+      final latRefTag = findTag(['GPS GPSLatitudeRef', 'GPS LatitudeRef', 'LatitudeRef']);
+      final lonRefTag = findTag(['GPS GPSLongitudeRef', 'GPS LongitudeRef', 'LongitudeRef']);
+
+      String source = "exif";
+      if (latTag != null && lonTag != null) {
+        final latRef = latRefTag?.toString() ?? 'N';
+        final lonRef = lonRefTag?.toString() ?? 'E';
+
+        double convertToDecimal(IfdTag tag, String ref) {
+          final values = tag.values.toList();
+          if (values.length < 3) return 0.0;
+          final double d = values[0].toDouble();
+          final double m = values[1].toDouble();
+          final double s = values[2].toDouble();
+          double res = d + (m / 60.0) + (s / 3600.0);
+          if (ref == 'S' || ref == 'W') res = -res;
+          return res;
+        }
+
+        gpsData = {
+          'latitude': convertToDecimal(latTag, latRef),
+          'longitude': convertToDecimal(lonTag, lonRef),
+        };
+        print("ADAR_DEBUG: Real GPS Metadata Extracted: $gpsData");
+      } else if (fallbackGps != null) {
+        gpsData = fallbackGps;
+        source = "device_signature";
+        print("ADAR_DEBUG: Using Device Signature Fallback: $gpsData");
+      } else {
+        print("ADAR_DEBUG: No GPS Metadata found and no fallback provided.");
+      }
+
       final image = img.decodeImage(bytes);
-      
       if (image == null) return null;
 
-      // 2. Perform Safety Crop (trim bottom 10%)
+      // --- 2. PERFORM WATERMARK REMOVAL (Safety Crop bottom 10%) ---
       // Most camera watermarks are in the bottom corners.
       final cropHeight = (image.height * 0.90).toInt();
       final croppedImage = img.copyCrop(
@@ -26,36 +73,23 @@ class MediaService {
         height: cropHeight,
       );
 
-      // 3. Save the cropped image to a temporary file
+      // --- 3. SAVE PROCESSED IMAGE ---
       final tempDir = await getTemporaryDirectory();
-      final croppedPath = p.join(tempDir.path, "cropped_${DateTime.now().millisecondsSinceEpoch}.jpg");
-      await File(croppedPath).writeAsBytes(img.encodeJpg(croppedImage, quality: 90));
+      final finalPath = p.join(tempDir.path, "processed_${DateTime.now().millisecondsSinceEpoch}.jpg");
+      
+      // We encode at high quality (95) to keep evidence clear
+      await File(finalPath).writeAsBytes(img.encodeJpg(croppedImage, quality: 95));
 
-      // 4. Further compress and ensure EXIF is stripped
-      final finalPath = p.join(tempDir.path, "anon_${DateTime.now().millisecondsSinceEpoch}.jpg");
-      final result = await FlutterImageCompress.compressAndGetFile(
-        croppedPath,
-        finalPath,
-        quality: 80,
-        keepExif: false, // Double check metadata is gone
-        format: CompressFormat.jpeg,
-      );
-
-      // Cleanup intermediate file
-      final intermediateFile = File(croppedPath);
-      if (await intermediateFile.exists()) {
-        await intermediateFile.delete();
-      }
-
-      return result != null ? File(result.path) : null;
+      return {
+        'file': File(finalPath),
+        'metadata': gpsData,
+        'source': source,
+      };
     } catch (e) {
       return null;
     }
   }
 
-  /// Re-encodes video to strip metadata. 
-  /// Note: video_compress doesn't easily support arbitrary cropping via API, 
-  /// but re-encoding itself often strips identifying metadata.
   static Future<File?> processVideo(File file) async {
     try {
       final info = await VideoCompress.compressVideo(
@@ -64,14 +98,12 @@ class MediaService {
         deleteOrigin: false,
         includeAudio: true,
       );
-
       return info?.file;
     } catch (e) {
       return null;
     }
   }
 
-  /// Clean up video compression cache
   static Future<void> dispose() async {
     await VideoCompress.deleteAllCache();
   }

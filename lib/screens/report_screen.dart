@@ -21,6 +21,8 @@ class _ReportScreenState extends State<ReportScreen> {
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   String? _locationText;
+  double? _incidentLat;
+  double? _incidentLon;
   bool _isLoadingLocation = false;
 
   // --- TRUST SCORE TRACKERS ---
@@ -29,6 +31,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   File? _selectedImage;
   File? _selectedVideo;
+  Map<String, double>? _capturedGps;
 
   final ImagePicker _picker = ImagePicker();
   VideoPlayerController? _videoController;
@@ -74,7 +77,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
       if (!mounted) return;
 
-      final String? result = await Navigator.push(
+      final dynamic result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => MapPicker(
@@ -83,7 +86,13 @@ class _ReportScreenState extends State<ReportScreen> {
         ),
       );
 
-      if (result != null) setState(() => _locationText = result);
+      if (result != null && result is Map<String, dynamic>) {
+        setState(() {
+          _locationText = result['address'];
+          _incidentLat = result['latitude'];
+          _incidentLon = result['longitude'];
+        });
+      }
     } catch (e) {
       _showSnackBar(e.toString(), isError: true);
     } finally {
@@ -125,6 +134,9 @@ class _ReportScreenState extends State<ReportScreen> {
           videoFile: _selectedVideo,
           isFromGallery: _isFromGallery,
           isMocked: _isMockLocation,
+          capturedGps: _capturedGps,
+          incidentLat: _incidentLat,
+          incidentLon: _incidentLon,
         ),
       ),
     );
@@ -253,10 +265,17 @@ class _ReportScreenState extends State<ReportScreen> {
 
     final XFile? file = await _picker.pickImage(
       source: source,
-      imageQuality: 50,
-      maxWidth: 1920,
     );
-    if (file != null) setState(() => _selectedImage = File(file.path));
+    if (file != null) {
+      // CAPTURE DEVICE SIGNATURE (TIMESTAMPED GPS)
+      try {
+        Position pos = await Geolocator.getCurrentPosition();
+        _capturedGps = {'latitude': pos.latitude, 'longitude': pos.longitude};
+      } catch (e) {
+        _capturedGps = null;
+      }
+      setState(() => _selectedImage = File(file.path));
+    }
   }
 
   Future<void> _pickVideo(ImageSource source) async {
@@ -265,6 +284,13 @@ class _ReportScreenState extends State<ReportScreen> {
 
     final XFile? file = await _picker.pickVideo(source: source);
     if (file != null) {
+      // CAPTURE DEVICE SIGNATURE (TIMESTAMPED GPS)
+      try {
+        Position pos = await Geolocator.getCurrentPosition();
+        _capturedGps = {'latitude': pos.latitude, 'longitude': pos.longitude};
+      } catch (e) {
+        _capturedGps = null;
+      }
       _selectedVideo = File(file.path);
       _videoController = VideoPlayerController.file(_selectedVideo!)
         ..initialize().then((_) => setState(() {}));

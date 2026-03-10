@@ -351,8 +351,11 @@ class _MapPickerState extends State<MapPicker> {
                         elevation: 0,
                       ),
                       onPressed: () {
-                        Navigator.pop(
-                            context, "$_address ($_coordsDisplay)");
+                        Navigator.pop(context, {
+                          'address': _address,
+                          'latitude': _mapController.camera.center.latitude,
+                          'longitude': _mapController.camera.center.longitude,
+                        });
                       },
                       child: const Text("Confirm Incident Spot",
                           style: TextStyle(
