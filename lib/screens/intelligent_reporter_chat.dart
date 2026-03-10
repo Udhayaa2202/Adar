@@ -152,46 +152,60 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
 
     try {
       final String reportId = "ADAR-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}";
-      final prefs = await SharedPreferences.getInstance();
-      final String userId = prefs.getString('anon_id') ?? "Unknown";
       Map<String, String> evidenceUrls = {};
-
-      // --- 1. UPLOAD IMAGE & CAPTURE METADATA ---
       Map<String, double>? photoMetadata;
       String? photoLocationSource;
+
+      final List<Future<void>> uploadTasks = [];
+
+      // --- TASK 1: IMAGE PROCESSING & UPLOAD ---
       if (widget.imageFile != null) {
-        final path = 'evidence/$reportId/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final result = await MediaService.processImage(widget.imageFile!, fallbackGps: widget.capturedGps);
-        if (result != null) {
-          final File processedFile = result['file'] as File;
-          photoMetadata = result['metadata'] as Map<String, double>?;
-          photoLocationSource = result['source'] as String?;
-          
-          final bytes = await processedFile.readAsBytes();
-          await supabase.storage.from('app_evidence').uploadBinary(path, bytes,
-              fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true));
-          evidenceUrls['image'] = supabase.storage.from('app_evidence').getPublicUrl(path);
-        }
+        uploadTasks.add(() async {
+          final path = 'evidence/$reportId/img_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          final result = await MediaService.processImage(widget.imageFile!, fallbackGps: widget.capturedGps);
+          if (result != null) {
+            final File processedFile = result['file'] as File;
+            photoMetadata = result['metadata'] as Map<String, double>?;
+            photoLocationSource = result['source'] as String?;
+            
+            final bytes = await processedFile.readAsBytes();
+            await supabase.storage.from('app_evidence').uploadBinary(path, bytes,
+                fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true));
+            evidenceUrls['image'] = supabase.storage.from('app_evidence').getPublicUrl(path);
+          }
+        }());
       }
 
-      // --- 2. UPLOAD VIDEO ---
       if (widget.videoFile != null) {
-        final path = 'evidence/$reportId/vid_${DateTime.now().millisecondsSinceEpoch}.mp4';
-        final processedVideo = await MediaService.processVideo(widget.videoFile!);
-        if (processedVideo != null) {
-          final bytes = await processedVideo.readAsBytes();
-          await supabase.storage.from('app_evidence').uploadBinary(path, bytes,
-              fileOptions: const FileOptions(contentType: 'video/mp4', upsert: true));
-          evidenceUrls['video'] = supabase.storage.from('app_evidence').getPublicUrl(path);
-        }
+        uploadTasks.add(() async {
+          final path = 'evidence/$reportId/vid_${DateTime.now().millisecondsSinceEpoch}.mp4';
+          final processedVideo = await MediaService.processVideo(widget.videoFile!);
+          if (processedVideo != null) {
+            final bytes = await processedVideo.readAsBytes();
+            await supabase.storage.from('app_evidence').uploadBinary(path, bytes,
+                fileOptions: const FileOptions(contentType: 'video/mp4', upsert: true));
+            evidenceUrls['video'] = supabase.storage.from('app_evidence').getPublicUrl(path);
+          }
+        }());
       }
 
-      // --- 3. CALCULATE TRUST SCORE ---
+      final prefsFuture = SharedPreferences.getInstance();
+
+      // EXECUTE ALL IN PARALLEL
+      final results = await Future.wait([
+        ...uploadTasks,
+        prefsFuture,
+      ]);
+
+      final prefs = results.last as SharedPreferences;
+      final String userId = prefs.getString('anon_id') ?? "Unknown";
+
+      // --- CALCULATE TRUST SCORE ---
       final Map<String, dynamic> trustResult = _calculateTrustScore();
       final int trustScore = trustResult['score'] as int;
       final Map<String, dynamic> trustBreakdown = trustResult['breakdown'] as Map<String, dynamic>;
 
-      // --- 4. SAVE TO FIREBASE ---
+      // --- SAVE TO FIREBASE ---
       await FirebaseFirestore.instance.collection('reports').doc(reportId).set({
         'reportId': reportId,
         'userId': userId,
@@ -213,7 +227,6 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // --- 5. UPDATE LOCAL PREFS (For Dashboard) ---
       await prefs.setDouble('trust_score', trustScore.toDouble());
 
       if (!mounted) return;
@@ -230,7 +243,6 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
     }
   }
 
-  /// Comprehensive trust scoring with breakdown for transparency
   Map<String, dynamic> _calculateTrustScore() {
     int score = 100;
     Map<String, dynamic> breakdown = {};
@@ -393,7 +405,6 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
       breakdown['fabricationFlag'] = -10;
     }
 
-    // Clamp to valid range
     score = score.clamp(0, 100);
     breakdown['finalScore'] = score;
 

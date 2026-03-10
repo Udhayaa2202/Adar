@@ -260,7 +260,6 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
-    // TRACK SOURCE FOR TRUST SCORING
     _isFromGallery = (source == ImageSource.gallery);
 
     final XFile? file = await _picker.pickImage(

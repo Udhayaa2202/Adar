@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_compress/video_compress.dart';
 import 'package:path_provider/path_provider.dart';
@@ -58,25 +60,11 @@ class MediaService {
         print("ADAR_DEBUG: No GPS Metadata found and no fallback provided.");
       }
 
-      final image = img.decodeImage(bytes);
-      if (image == null) return null;
-
-
-      final cropHeight = (image.height * 0.90).toInt();
-      final croppedImage = img.copyCrop(
-        image,
-        x: 0,
-        y: 0,
-        width: image.width,
-        height: cropHeight,
-      );
-
-      // --- 3. SAVE PROCESSED IMAGE ---
+      // --- 2. OFF-LOAD HEAVY PROCESSING TO ISOLATE ---
       final tempDir = await getTemporaryDirectory();
       final finalPath = p.join(tempDir.path, "processed_${DateTime.now().millisecondsSinceEpoch}.jpg");
-      
-      // We encode at high quality (95) to keep evidence clear
-      await File(finalPath).writeAsBytes(img.encodeJpg(croppedImage, quality: 95));
+
+      await compute(_isolateImageProcessing, _ImageProcessTask(bytes, finalPath));
 
       return {
         'file': File(finalPath),
@@ -105,4 +93,36 @@ class MediaService {
   static Future<void> dispose() async {
     await VideoCompress.deleteAllCache();
   }
+}
+
+/// Helper class for image processing in Isolate
+class _ImageProcessTask {
+  final Uint8List bytes;
+  final String outputPath;
+  _ImageProcessTask(this.bytes, this.outputPath);
+}
+
+/// Top-level function for compute to handle heavy image work
+Future<void> _isolateImageProcessing(_ImageProcessTask task) async {
+  var image = img.decodeImage(task.bytes);
+  if (image == null) return;
+
+  // --- 1. RESIZE IF TOO LARGE (Max 1600px width/height) ---
+  if (image.width > 1600 || image.height > 1600) {
+    image = img.copyResize(image, width: image.width > image.height ? 1600 : null, height: image.height >= image.width ? 1600 : null);
+  }
+
+  // --- 2. CROP BOTTOM 10% (As per existing logic) ---
+  final cropHeight = (image.height * 0.90).toInt();
+  final croppedImage = img.copyCrop(
+    image,
+    x: 0,
+    y: 0,
+    width: image.width,
+    height: cropHeight,
+  );
+
+  // --- 3. ENCODE WITH OPTIMIZED QUALITY (80) ---
+  final encodedBytes = img.encodeJpg(croppedImage, quality: 80);
+  await File(task.outputPath).writeAsBytes(encodedBytes);
 }
