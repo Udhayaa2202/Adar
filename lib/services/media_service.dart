@@ -7,8 +7,7 @@ import 'package:image/image.dart' as img;
 import 'package:exif/exif.dart';
 
 class MediaService {
-  /// Processes image: Extracts metadata, then applies a crop to remove watermarks.
-  /// Returns a Map containing the processed file and extracted GPS metadata.
+  
   static Future<Map<String, dynamic>?> processImage(File file, {Map<String, double>? fallbackGps}) async {
     try {
       final bytes = await file.readAsBytes();
@@ -62,8 +61,7 @@ class MediaService {
       final image = img.decodeImage(bytes);
       if (image == null) return null;
 
-      // --- 2. PERFORM WATERMARK REMOVAL (Safety Crop bottom 10%) ---
-      // Most camera watermarks are in the bottom corners.
+
       final cropHeight = (image.height * 0.90).toInt();
       final croppedImage = img.copyCrop(
         image,
