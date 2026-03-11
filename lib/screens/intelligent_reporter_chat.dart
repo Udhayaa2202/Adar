@@ -48,6 +48,7 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
   bool _isFinalized = false;
   bool _isUploading = false;
   int _currentQuestionIndex = 0;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -147,7 +148,10 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
   }
 
   Future<void> _submitEverything() async {
-    setState(() => _isUploading = true);
+    setState(() {
+      _isUploading = true;
+      _errorMessage = null; // Clear previous error on retry
+    });
     final supabase = Supabase.instance.client;
 
     try {
@@ -233,10 +237,10 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
       _navigateToSuccess(reportId);
     } catch (e) {
       if (mounted) {
-        setState(() => _isUploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Submission Error: $e"), backgroundColor: Colors.red),
-        );
+        setState(() {
+          _isUploading = false;
+          _errorMessage = e.toString();
+        });
       }
     } finally {
       MediaService.dispose();
@@ -449,16 +453,47 @@ class _IntelligentReporterChatState extends State<IntelligentReporterChat> {
   Widget _buildSubmitSection() {
     return Padding(
       padding: const EdgeInsets.all(20),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue[800],
-          minimumSize: const Size(double.infinity, 60),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        ),
-        onPressed: _isUploading ? null : _submitEverything,
-        child: _isUploading
-            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : Text(AppLocalizations.of(context)!.finalizeSubmit, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_errorMessage != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      AppLocalizations.of(context)!.submissionFailed,
+                      style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _errorMessage != null ? Colors.orange[800] : Colors.blue[800],
+              minimumSize: const Size(double.infinity, 60),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            onPressed: _isUploading ? null : _submitEverything,
+            child: _isUploading
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Text(
+                    _errorMessage != null ? AppLocalizations.of(context)!.retry : AppLocalizations.of(context)!.finalizeSubmit,
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+          ),
+        ],
       ),
     );
   }

@@ -75,5 +75,7 @@
   "aboutTrustScore": "About trust score",
   "trustScoreInfoTitle": "Trust Score System",
   "trustScoreCriteria": "Our algorithm evaluates reports based on several signals:\n\n• Description Detail: Detailed reports gain more trust.\n• Evidence Quality: Providing both photos and videos increases the score.\n• Incident Recency: Reporting incidents quickly ensures higher accuracy.\n\nA score of 100 indicates a highly reliable report.",
-  "reportTrustScore": "Report Trust Score"
+  "reportTrustScore": "Report Trust Score",
+  "retry": "RETRY SUBMISSION",
+  "submissionFailed": "Submission failed. Please check your connection and try again."
 }

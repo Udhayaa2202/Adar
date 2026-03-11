@@ -229,4 +229,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportTrustScore => 'Report Trust Score';
+
+  @override
+  String get retry => 'RETRY SUBMISSION';
+
+  @override
+  String get submissionFailed =>
+      'Submission failed. Please check your connection and try again.';
 }

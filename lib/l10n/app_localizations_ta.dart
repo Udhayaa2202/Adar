@@ -230,4 +230,11 @@ class AppLocalizationsTa extends AppLocalizations {
 
   @override
   String get reportTrustScore => 'புகார் நம்பகத்தன்மை மதிப்பீடு';
+
+  @override
+  String get retry => 'RETRY SUBMISSION';
+
+  @override
+  String get submissionFailed =>
+      'Submission failed. Please check your connection and try again.';
 }

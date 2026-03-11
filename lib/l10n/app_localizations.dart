@@ -517,6 +517,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Report Trust Score'**
   String get reportTrustScore;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'RETRY SUBMISSION'**
+  String get retry;
+
+  /// No description provided for @submissionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Submission failed. Please check your connection and try again.'**
+  String get submissionFailed;
 }
 
 class _AppLocalizationsDelegate
