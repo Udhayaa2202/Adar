@@ -158,8 +158,7 @@ class _MapPickerState extends State<MapPicker> {
             ),
             children: [
               TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: 'https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}',
                 userAgentPackageName: 'com.example.adar',
               ),
             ],
